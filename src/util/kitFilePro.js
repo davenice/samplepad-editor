@@ -1,0 +1,363 @@
+/* App imports */
+import { Buffer } from 'buffer'
+import { KitBuffer, Drive } from 'const'
+import { KitModel, PadModel } from 'state/models'
+import { getSortedPadIds } from 'state/sortModels'
+import { getBuffer } from 'util/buffer'
+import SampleStore from 'util/sampleStore'
+
+/* Electron imports */
+const { fs, path } = window.api;
+
+/** @var { Map } memory location within individual memory blocks for each parameter */
+const MEMLOC = {
+  midiNote:     0x39,
+  location:     0x07,
+  level:        0x29,
+  tune:         0x2d,
+  pan:          0x31,
+  reverb:       0x35,
+  mode:         0x3d,
+  sensitivity:  0x41,
+  mgrp:         0x49,
+  velocityMin:  0x82,
+  velocityMax:  0x83,
+  velocityMinB: 0xa2,
+  velocityMaxB: 0xa4,
+
+  hasFileLayerA:   0x80,
+  fileNameLength:  0x87,
+  displayName:     0x88,
+  fileName:        0x90,
+
+  hasFileLayerB:   0xa0,
+  fileNameBLength: 0xa7,
+  displayNameB:    0xa8,
+  fileNameB:       0xb0
+}
+
+/**
+ * Given a file, get the kit and pads
+ * @param {RootModel} drive
+ * @param {String} kitFile - the file to parse
+ * @return {KitModel, PadModel[]} kit, pads
+ */
+export const getKitAndPadsFromFile = (drive, kitFile) => {
+  if(!fs.exists(kitFile)) {
+    return null;
+  }
+
+  let kitPath = path.parse(kitFile);
+  let buffer = getBuffer(kitFile);
+  let checksum = buffer.readUInt8(KitBuffer.CHECKSUM_BYTE);
+
+  if (checksum !== calculateChecksumFromBuffer(buffer)) {
+    throw new Error("Invalid .kit file")
+  }
+
+  // need to get the global device
+  let pads = getPadsFromBuffer(drive, buffer);
+
+  var kit = KitModel(
+    kitPath.dir,
+    kitPath.base,
+    true,
+    false,
+    true,
+    kitPath.name,
+    getSortedPadIds(drive, pads)
+  );
+
+  return {kit, pads};
+}
+
+/**
+ * given a kit and pads, get a file buffer
+ * @param {KitModel} kit
+ * @param {PadModel[]} pads
+ * @returns {Buffer}
+ */
+export const getKitFileBuffer = (drive, kit, pads) => {
+  let buffer = [];
+
+  // header
+  buffer = buffer.concat(getHeader(kit.kitName));
+
+  KitBuffer.PAD_FILE_ORDER[drive.deviceType].forEach((padType) => {
+    let pad = getPadWithType(kit, pads, padType);
+    buffer = buffer.concat(getPadBlock1(pad));
+  });
+
+  KitBuffer.PAD_FILE_ORDER[drive.deviceType].forEach((padType) => {
+    let pad = getPadWithType(kit, pads, padType);
+    buffer = buffer.concat(getPadBlock2(pad));
+  });
+
+  // splice in the checksum
+  let checksum = calculateChecksumFromBuffer(buffer);
+  buffer.splice(KitBuffer.CHECKSUM_BYTE, 1, checksum);
+
+  return Buffer.from(buffer);
+}
+
+/**
+ * @param {Buffer}
+ * @returns {Byte}
+ */
+const calculateChecksumFromBuffer = (buffer) => {
+  return buffer
+    .slice(KitBuffer.CHECKSUM_BYTE + 1)
+    .reduce((a, b) => a + b) % 256;
+}
+
+/*********************
+ * GET KIT FROM FILE *
+ *********************/
+/**
+ * @param {RootModel} drive
+ * @param {Buffer} buffer
+ * @return {Map} padId => PadModel
+ */
+const getPadsFromBuffer = (drive, buffer) => {
+  let headerLength = 128;
+  let blockLength = 256;
+  let offset = headerLength;
+
+  let block1 = {};
+  KitBuffer.PAD_FILE_ORDER[drive.deviceType].forEach((padType) => {
+    block1[padType] = buffer.slice(offset, offset+blockLength);
+    offset += blockLength;
+  });
+
+  let block2 = {};
+  KitBuffer.PAD_FILE_ORDER[drive.deviceType].forEach((padType) => {
+    block2[padType] = buffer.slice(offset, offset+blockLength);
+    offset += blockLength;
+  });
+
+  let pads = {};
+  KitBuffer.PAD_FILE_ORDER[drive.deviceType].forEach((padType) => {
+    let pad = getPadFromBufferBlocks(padType, block1[padType], block2[padType]);
+    pads[pad.id] = pad;
+  });
+
+  return pads;
+}
+
+/**
+ * @param {String} padType
+ * @param {Buffer} block1
+ * @param {Buffer} block2
+ * @return {PadModel}
+ */
+const getPadFromBufferBlocks = (padType, block1, block2) => {
+  // block 1
+  let midiNote = block1.readUInt8(MEMLOC.midiNote);
+  let location = block1.readUInt8(MEMLOC.location);
+  let level    = block1.readUInt8(MEMLOC.level);
+  let tune     = block1.readUInt8(MEMLOC.tune);
+  let pan      = block1.readUInt8(MEMLOC.pan);
+  let reverb   = block1.readUInt8(MEMLOC.reverb);
+  let mode     = block1.readUInt8(MEMLOC.mode);
+  let sensInternal = block1.readUInt8(MEMLOC.sensitivity);
+  let sens     = (sensInternal - 12) / 2;  // Convert to display value for Samplepad Pro
+  let mgrp     = block1.readUInt8(MEMLOC.mgrp);
+
+  // block 2
+  let velocityMin  = block2.readUInt8(MEMLOC.velocityMin);
+  let velocityMax  = block2.readUInt8(MEMLOC.velocityMax);
+  let velocityMinB = block2.readUInt8(MEMLOC.velocityMinB);
+  let velocityMaxB = block2.readUInt8(MEMLOC.velocityMaxB);
+
+  let hasFileLayerA = (block2.readUInt8(MEMLOC.hasFileLayerA) === 0xaa);
+  let fileName = ""
+  if (hasFileLayerA) {
+    let fileLength = block2.readUInt8(MEMLOC.fileNameLength);
+    fileName = block2.toString("utf-8", MEMLOC.fileName, MEMLOC.fileName + fileLength) + Drive.SAMPLE_EXTENSION;
+    fileName = SampleStore.getFileNameFromKitFile(fileName)
+  }
+
+  let hasFileLayerB = (block2.readUInt8(MEMLOC.hasFileLayerB) === 0xaa);
+  let fileNameB = ""
+  if (hasFileLayerB) {
+    let fileLength = block2.readUInt8(MEMLOC.fileNameBLength);
+    fileNameB = block2.toString("utf-8", MEMLOC.fileNameB, MEMLOC.fileNameB + fileLength) + Drive.SAMPLE_EXTENSION;
+    fileNameB = SampleStore.getFileNameFromKitFile(fileNameB)
+  }
+
+  return PadModel.fromFile(padType, location, level, tune, pan, reverb, midiNote, mode, sens, mgrp, velocityMin, velocityMax, fileName, velocityMinB, velocityMaxB, fileNameB);
+}
+
+/**
+ * @param {KitModel} kit
+ * @param {PadModel[]} pads
+ * @param {String} padType
+ * @returns {PadModel|null}
+ */
+export const getPadWithType = (kit, pads, padType) => {
+  let returnPad = null;
+
+  kit.pads.forEach(function(padId) {
+    let pad = pads[padId];
+    if (pad.padType === padType) {
+      returnPad = pad;
+    }
+  })
+
+  if (!returnPad) {
+    // for some reason we couldnt find a valid pad, return a default one
+    return PadModel.getPad(padType);
+  }
+
+  return returnPad;
+}
+
+/********************
+ * SAVE KIT TO FILE *
+ ********************/
+/**
+ * Turn a string into an array of bytes with a given length, padding the right as necessary
+ * @param {String} str
+ * @param {Number} padLength
+ * @param {Byte} padByte
+ * @returns {Byte[]}
+ */
+const unpack = (str, padLength, padByte) => {
+  let strBuffer = Array(padLength).fill(padByte);
+  strBuffer.splice(0, str.length, ...Buffer.from(str));
+
+  return strBuffer;
+}
+
+/**
+ * Kit File Header - one per kit file
+ * Header contains checksum at byte 0x08
+ * And kit name (which seems unecessary since kit name is read from the file) starting at byte 0x48
+ * Kit Name String length is at byte 0x47
+ * @return {Byte[]}
+ */
+const getHeader = (kitName) => {
+  let block = [
+    0x4b, 0x49, 0x54, 0x48, 0x00, 0x80, 0x00, 0x00, 0xeb, 0x00, 0x00, 0x18, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+  ];
+
+  // Add kit name at byte 0x47 (length) and 0x48+ (name)
+  block.splice(0x47, 1, kitName.length);
+  let kitNameBytes = unpack(kitName, 56, 0x00);  // Max 56 chars, null-padded
+  block.splice(0x48, 56, ...kitNameBytes);
+
+  return block;
+}
+
+/**
+ * Pad Block 1 - one per pad
+ * @param {PadModel} pad
+ * @return {Byte[]}
+ */
+const getPadBlock1 = (pad) => {
+  // note: sensitivity here is the INTERNAL value
+  // 1=11 (0x0c), 2=14 3=17 4=20 5=23 6=26 7=29 8=32
+  let block = [
+    0x4b, 0x49, 0x54, 0x49, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x07,
+    0x32, 0x32, 0x41, 0x63, 0x42, 0x64, 0x31, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x18, 0x00, 0x09, 0x00, 0x00, 0x00, 0x05, 0x00, 0x0a, 0x01, 0x00, 0x04, 0x08,
+    0x02, 0x00, 0x04, 0x08, 0x03, 0x00, 0x00, 0x0a, 0x08, 0x00, 0x00, 0x7f, 0x09, 0x01, 0x00, 0x05,
+    0x0c, 0x0c, 0x00, 0x08, 0x0d, 0x00, 0x00, 0x09, 0x0e, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x7f,
+    0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x11, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x12, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x13, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x15, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x16, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x17, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x19, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x1b, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0e, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+  ];
+
+  // splice in the parameters
+  block.splice(MEMLOC.midiNote, 1,    pad.midiNote);
+  block.splice(MEMLOC.location, 1,    pad.location);
+  block.splice(MEMLOC.level, 1,       pad.level);
+  block.splice(MEMLOC.tune, 1,        PadModel.getUIntFileValue(pad.tune));
+  block.splice(MEMLOC.pan, 1,         PadModel.getUIntFileValue(pad.pan));
+  block.splice(MEMLOC.reverb, 1,      pad.reverb);
+  block.splice(MEMLOC.mode, 1,        pad.mode);
+  // Samplepad Pro uses: internal = display * 2 + 12
+  let sensitivityInternal = pad.sensitivity * 2 + 12;
+  block.splice(MEMLOC.sensitivity, 1, sensitivityInternal);
+  block.splice(MEMLOC.mgrp, 1,        pad.mgrp);
+
+  return block;
+}
+
+/**
+ * Pad Block 2 - one per pad
+ * @param {PadModel} pad
+ * @return {Byte[]}
+ */
+const getPadBlock2 = (pad) => {
+  let block = [
+    0x4b, 0x49, 0x54, 0x49, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x18, 0x00, 0x09, 0x00, 0x00, 0x00, 0x05, 0x00, 0x0a, 0x01, 0x00, 0x04, 0x08,
+    0x02, 0x00, 0x04, 0x08, 0x03, 0x00, 0x00, 0x0a, 0x08, 0x00, 0x00, 0x7f, 0x09, 0x01, 0x00, 0x05,
+    0x0c, 0x0c, 0x00, 0x08, 0x0d, 0x00, 0x00, 0x09, 0x0e, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0xff, 0xaa, 0x00, 0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0xff, 0xaa, 0x00, 0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+  ];
+
+  // splice in the parameters
+  block.splice(MEMLOC.midiNote, 1,     pad.midiNote);
+  // Location is NOT written to Block 2 (only in Block 1)
+  block.splice(MEMLOC.level, 1,        pad.level);
+  block.splice(MEMLOC.tune, 1,         PadModel.getUIntFileValue(pad.tune));
+  block.splice(MEMLOC.pan, 1,          PadModel.getUIntFileValue(pad.pan));
+  block.splice(MEMLOC.reverb, 1,       pad.reverb);
+  block.splice(MEMLOC.mode, 1,         pad.mode);
+  // Samplepad Pro uses: internal = display * 2 + 12
+  let sensitivityInternal = pad.sensitivity * 2 + 12;
+  block.splice(MEMLOC.sensitivity, 1,  sensitivityInternal);
+  block.splice(MEMLOC.mgrp, 1,         pad.mgrp);
+  block.splice(MEMLOC.velocityMin, 1,  pad.velocityMin);
+  block.splice(MEMLOC.velocityMax, 1,  pad.velocityMax);
+  block.splice(MEMLOC.velocityMinB, 1, pad.velocityMinB);
+  block.splice(MEMLOC.velocityMaxB, 1, pad.velocityMaxB);
+
+  // splice in the file information
+  let fileName = SampleStore.getWriteFileName(pad.fileName)
+  let fileNameUpperBytes = unpack(fileName.toUpperCase(), 8, 0x20)
+  let fileNameBytes = unpack(fileName, 8, 0x00)
+  block.splice(MEMLOC.fileNameLength, 1, fileName.length);
+  block.splice(MEMLOC.displayName, 8, ...fileNameUpperBytes);
+  block.splice(MEMLOC.fileName, 8, ...fileNameBytes);
+  block.splice(MEMLOC.hasFileLayerA, 1, ((fileName === "") ? 0xff : 0xaa));
+
+  // splice in the file information for layer b
+  let fileNameB = SampleStore.getWriteFileName(pad.fileNameB)
+  let fileNameBUpperBytes = unpack(fileNameB.toUpperCase(), 8, 0x20)
+  let fileNameBBytes = unpack(fileNameB, 8, 0x00)
+  block.splice(MEMLOC.fileNameBLength, 1, fileNameB.length);
+  block.splice(MEMLOC.displayNameB, 8, ...fileNameBUpperBytes);
+  block.splice(MEMLOC.fileNameB, 8, ...fileNameBBytes);
+  block.splice(MEMLOC.hasFileLayerB, 1, ((fileNameB === "") ? 0xff : 0xaa));
+
+  return block;
+}

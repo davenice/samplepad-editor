@@ -1,11 +1,19 @@
 /* App imports */
-import { Actions, MidiMap, KitErrors } from 'const';
+import { Actions, MidiMap, KitErrors, DeviceType } from 'const';
 import { confirmFileOverwrite } from 'actions/modal';
 import { showNotice } from 'actions/notice';
 import { KitModel, PadModel } from 'state/models';
 import { openKitFileDialog } from 'util/fileDialog';
-import { getKitAndPadsFromFile } from 'util/kitFile';
+import { getKitAndPadsFromFile as getKitAndPadsFromFileRack } from 'util/kitFile';
+import { getKitAndPadsFromFile as getKitAndPadsFromFilePro } from 'util/kitFilePro';
 import { saveKitToFile, kitWillOverwriteExisting } from 'util/storage';
+
+// Device-aware wrapper for getKitAndPadsFromFile
+const getKitAndPadsFromFile = (drive, filePath) => {
+  return drive.deviceType === DeviceType.SAMPLEPAD_PRO
+    ? getKitAndPadsFromFilePro(drive, filePath)
+    : getKitAndPadsFromFileRack(drive, filePath);
+};
 
 /** KIT ACTION CREATORS */
 /**

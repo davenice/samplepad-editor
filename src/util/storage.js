@@ -2,12 +2,20 @@
 import { WaveFile } from 'wavefile'
 
 /* App imports */
-import { Drive } from 'const'
+import { Drive, DeviceType } from 'const'
 import { getBuffer } from 'util/buffer'
-import { getKitFileBuffer } from 'util/kitFile'
+import { getKitFileBuffer as getKitFileBufferRack } from 'util/kitFile'
+import { getKitFileBuffer as getKitFileBufferPro } from 'util/kitFilePro'
 
 /* Electron imports */
 const { store, fs, path } = window.api
+
+// Device-aware wrapper for getKitFileBuffer
+const getKitFileBuffer = (drive, kit, pads) => {
+  return drive.deviceType === DeviceType.SAMPLEPAD_PRO
+    ? getKitFileBufferPro(drive, kit, pads)
+    : getKitFileBufferRack(drive, kit, pads);
+};
 
 /**
  * Store the directory for next time the app opens
