@@ -10,6 +10,33 @@ import { getKitFileBuffer as getKitFileBufferPro } from 'util/kitFilePro'
 /* Electron imports */
 const { store, fs, path } = window.api
 
+// File sizes for device type detection
+const SAMPLEPAD_PRO_KIT_SIZE = 8832;  // 128 header + 17 pads * 512
+const SAMPLERACK_KIT_SIZE = 12416;     // 128 header + 24 pads * 512
+
+/**
+ * Detect device type from a kit file by examining its size
+ * @param {String} kitFilePath - path to the kit file
+ * @returns {String} DeviceType.SAMPLEPAD_PRO or DeviceType.SAMPLERACK
+ */
+export function detectDeviceTypeFromKitFile(kitFilePath) {
+  if (!fs.exists(kitFilePath)) {
+    return null;
+  }
+
+  const buffer = getBuffer(kitFilePath);
+  const fileSize = buffer.length;
+
+  if (fileSize === SAMPLEPAD_PRO_KIT_SIZE) {
+    return DeviceType.SAMPLEPAD_PRO;
+  } else if (fileSize === SAMPLERACK_KIT_SIZE) {
+    return DeviceType.SAMPLERACK;
+  }
+
+  // Default to current behavior if size doesn't match
+  return null;
+}
+
 // Device-aware wrapper for getKitFileBuffer
 const getKitFileBuffer = (drive, kit, pads) => {
   return drive.deviceType === DeviceType.SAMPLEPAD_PRO
