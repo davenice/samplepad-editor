@@ -1,0 +1,1 @@
+test-kit1.KIT was generated from the Samplepad Editor as a reference before the Samplepad Pro support was added.
