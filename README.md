@@ -57,6 +57,43 @@ Want to build the app yourself?
 ```
 git clone https://github.com/LesserChance/samplepad-editor.git
 cd samplepad-editor
-yarn install
-yarn run electron-dev
+npm install
+npm run dev
+```
+
+### Testing
+Run the test suite to verify kit file parsing:
+
+```bash
+npm test              # Run all tests
+npm run test:watch    # Watch mode for development
+npm run test:coverage # Generate coverage report
+```
+
+**Writing Tests**
+- Unit tests: `tests/unit/` - Test individual parsers
+- Integration tests: `tests/integration/` - Test round-trip parsing
+- Test utilities: `tests/utils/` - Helpers for serialization and assertions
+
+**Creating Test Data**
+Test data is stored as JSON in `tests/fixtures/`:
+- `samplepad-pro/` - 17 pads, formula-based sensitivity
+- `samplerack/` - 24 pads, lookup table sensitivity
+
+To create new test fixtures:
+1. Create a `.json` file with kit/pad data (see existing fixtures for schema)
+2. Generate the binary `.KIT` file: `npm test -- tests/utils/generate-fixtures.test.js`
+3. Commit both `.json` and `.KIT` files
+
+JSON format:
+```json
+{
+  "kit": { "deviceType": "samplepad_pro", "kitName": "Test", "fileName": "test.KIT" },
+  "pads": [
+    { "padType": "pad_01", "location": 1, "level": 10, "tune": 0, "pan": 0,
+      "reverb": 0, "midiNote": 49, "mode": 1, "sensitivity": 5, "mgrp": 0,
+      "velocityMin": 0, "velocityMax": 127, "fileName": "sample.wav",
+      "velocityMinB": 0, "velocityMaxB": 127, "fileNameB": "" }
+  ]
+}
 ```

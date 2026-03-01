@@ -188,7 +188,6 @@ export const KitBuffer = {
  */
 export const MidiMap = {
   [DeviceType.SAMPLERACK]: {
-    kick:   ["Bass Drum 1",     36],
     snr_a:  ["Snare Drum 1",    38],
     snr_b:  ["Snare Drum 2",    40],
     tom1a:  ["High Tom 2",      48],
@@ -202,13 +201,14 @@ export const MidiMap = {
     cr2a:   ["Crash Cymbal 2",  57],
     cr2b:   ["Chinese Cymbal",  52],
     ridea:  ["Ride Cymbal 1",   51],
-    rideb:  ["Ride Bell",       53],
     ride2:  ["Ride Cymbal 2",   59],
+    rideb:  ["Ride Bell",       53],
+    kick:   ["Bass Drum 1",     36],
     hha_op: ["Open Hi-hat 1",   46],
-    hha_md: ["Mid Hi-hat 1",    23],
-    hha_cl: ["Closed Hi-hat 1", 42],
     hhb_op: ["Open Hi-hat 2",   26],
+    hha_md: ["Mid Hi-hat 1",    23],
     hhb_md: ["Mid Hi-hat 2",    24],
+    hha_cl: ["Closed Hi-hat 1", 42],
     hhb_cl: ["Closed Hi-hat 2", 22],
     hh_chk: ["Pedal Hi-hat",    44],
     hh_spl: ["Spl Hi-hat 1",    21]

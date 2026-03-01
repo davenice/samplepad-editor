@@ -63,7 +63,9 @@ class SampleStore {
     }
 
     if (!fileNameOnDisk) {
-      return ""
+      // File not in deviceSamples - strip .wav and return
+      // This handles internal samples that don't have a wav file
+      return fileName.replace(Drive.SAMPLE_EXTENSION, "")
     }
 
     return fileNameOnDisk.replace(Drive.SAMPLE_EXTENSION, "")
@@ -90,6 +92,7 @@ class SampleStore {
       return reverseList[matchingKey]
     }
 
+    // File not found in deviceSamples - return as-is (external sample not yet loaded)
     return fileName
   }
 

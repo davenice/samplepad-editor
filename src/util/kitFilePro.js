@@ -169,14 +169,25 @@ const getPadFromBufferBlocks = (padType, block1, block2) => {
   let velocityMinB = block2.readUInt8(MEMLOC.velocityMinB);
   let velocityMaxB = block2.readUInt8(MEMLOC.velocityMaxB);
 
-  let hasFileLayerA = (block2.readUInt8(MEMLOC.hasFileLayerA) === 0xaa);
   let fileName = ""
-  if (hasFileLayerA) {
-    let fileLength = block2.readUInt8(MEMLOC.fileNameLength);
-    fileName = block2.toString("utf-8", MEMLOC.fileName, MEMLOC.fileName + fileLength) + Drive.SAMPLE_EXTENSION;
-    fileName = SampleStore.getFileNameFromKitFile(fileName)
+  if (location === 0) {
+    // Internal sample - read name from block 1 offset 0x10
+    let fileLength = block1.readUInt8(0x0F);
+    if (fileLength > 0) {
+      fileName = block1.toString("utf-8", 0x10, 0x10 + fileLength);
+      // Internal samples don't use .wav extension
+    }
+  } else {
+    // External sample - read from block 2
+    let hasFileLayerA = (block2.readUInt8(MEMLOC.hasFileLayerA) === 0xaa);
+    if (hasFileLayerA) {
+      let fileLength = block2.readUInt8(MEMLOC.fileNameLength);
+      fileName = block2.toString("utf-8", MEMLOC.fileName, MEMLOC.fileName + fileLength) + Drive.SAMPLE_EXTENSION;
+      fileName = SampleStore.getFileNameFromKitFile(fileName)
+    }
   }
 
+  // TODO: Check whether layer B can have internal sample names separately
   let hasFileLayerB = (block2.readUInt8(MEMLOC.hasFileLayerB) === 0xaa);
   let fileNameB = ""
   if (hasFileLayerB) {
@@ -185,7 +196,26 @@ const getPadFromBufferBlocks = (padType, block1, block2) => {
     fileNameB = SampleStore.getFileNameFromKitFile(fileNameB)
   }
 
-  return PadModel.fromFile(padType, location, level, tune, pan, reverb, midiNote, mode, sens, mgrp, velocityMin, velocityMax, fileName, velocityMinB, velocityMaxB, fileNameB);
+  // Use getPad directly since we've already converted values to display format
+  // (fromFile would try to convert sensitivity again using the wrong SampleRack formula)
+  return PadModel.getPad(
+    padType,
+    location,
+    level,
+    PadModel.getUIntDisplayValue(tune),
+    PadModel.getUIntDisplayValue(pan),
+    reverb,
+    midiNote,
+    mode,
+    sens,  // Already converted using SamplePad Pro formula
+    mgrp,
+    velocityMin,
+    velocityMax,
+    fileName,
+    velocityMinB,
+    velocityMaxB,
+    fileNameB
+  );
 }
 
 /**
@@ -224,7 +254,9 @@ export const getPadWithType = (kit, pads, padType) => {
  */
 const unpack = (str, padLength, padByte) => {
   let strBuffer = Array(padLength).fill(padByte);
-  strBuffer.splice(0, str.length, ...Buffer.from(str));
+  // Truncate string to padLength before converting to bytes
+  const strBytes = Buffer.from(str).slice(0, padLength);
+  strBuffer.splice(0, strBytes.length, ...strBytes);
 
   return strBuffer;
 }
@@ -295,6 +327,19 @@ const getPadBlock1 = (pad) => {
   let sensitivityInternal = pad.sensitivity * 2 + 12;
   block.splice(MEMLOC.sensitivity, 1, sensitivityInternal);
   block.splice(MEMLOC.mgrp, 1,        pad.mgrp);
+
+  // Handle internal sample names at offset 0x0F (length) and 0x10 (name)
+  if (pad.location === 0 && pad.fileName) {
+    // Internal samples: strip number prefix (e.g., "091-14AcHHCl" -> "14AcHHCl")
+    let internalName = pad.fileName.replace(/^\d+-/, '').replace(/\.wav$/, '');
+    let internalNameBytes = unpack(internalName, 8, 0x00);
+    block.splice(0x0F, 1, internalName.length);
+    block.splice(0x10, 8, ...internalNameBytes);
+  } else {
+    // External samples or empty pads: clear the default template name
+    block.splice(0x0F, 1, 0);
+    block.splice(0x10, 8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+  }
 
   return block;
 }
