@@ -63,9 +63,10 @@ describe('SampleRack Parser', () => {
       const kitPath = path.join(FIXTURES_PATH, 'test-kit1.KIT')
       const result = getKitAndPadsFromFile(mockDrive, kitPath)
       const expectedPadTypes = [
+        'kick',
         'snr_a', 'snr_b', 'tom1a', 'tom1b', 'tom2a', 'tom2b', 'tom3a', 'tom3b',
-        'cr1a', 'cr1b', 'cr2a', 'cr2b', 'ridea', 'ride2', 'rideb', 'kick',
-        'hha_op', 'hhb_op', 'hha_md', 'hhb_md', 'hha_cl', 'hhb_cl', 'hh_chk', 'hh_spl'
+        'cr1a', 'cr1b', 'cr2a', 'cr2b', 'ridea', 'rideb', 'ride2',
+        'hha_op', 'hha_md', 'hha_cl', 'hhb_op', 'hhb_md', 'hhb_cl', 'hh_chk', 'hh_spl'
       ]
 
       // Convert pads object to array, sorted by kit.pads order
