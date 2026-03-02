@@ -49,7 +49,26 @@ class SampleStore {
       return ""
     }
 
-    return this.deviceSamples[fileName].replace(Drive.SAMPLE_EXTENSION, "")
+    // Case-insensitive lookup: try exact match first, then lowercase match
+    let fileNameOnDisk = this.deviceSamples[fileName]
+    if (!fileNameOnDisk) {
+      // Try case-insensitive lookup
+      const lowerFileName = fileName.toLowerCase()
+      const matchingKey = Object.keys(this.deviceSamples).find(
+        key => key.toLowerCase() === lowerFileName
+      )
+      if (matchingKey) {
+        fileNameOnDisk = this.deviceSamples[matchingKey]
+      }
+    }
+
+    if (!fileNameOnDisk) {
+      // File not in deviceSamples - strip .wav and return
+      // This handles internal samples that don't have a wav file
+      return fileName.replace(Drive.SAMPLE_EXTENSION, "")
+    }
+
+    return fileNameOnDisk.replace(Drive.SAMPLE_EXTENSION, "")
   }
 
   getFileNameFromKitFile(fileName) {
@@ -59,10 +78,21 @@ class SampleStore {
 
     let reverseList = this._getFlippedDeviceSamples()
 
+    // Try exact match first
     if (reverseList[fileName]) {
       return reverseList[fileName]
     }
 
+    // Try case-insensitive match
+    const lowerFileName = fileName.toLowerCase()
+    const matchingKey = Object.keys(reverseList).find(
+      key => key.toLowerCase() === lowerFileName
+    )
+    if (matchingKey) {
+      return reverseList[matchingKey]
+    }
+
+    // File not found in deviceSamples - return as-is (external sample not yet loaded)
     return fileName
   }
 

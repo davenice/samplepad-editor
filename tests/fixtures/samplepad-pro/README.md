@@ -1,0 +1,1 @@
+test-kit1.KIT is an actual SamplePad Pro kit.

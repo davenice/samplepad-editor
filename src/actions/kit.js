@@ -1,11 +1,43 @@
 /* App imports */
-import { Actions, MidiMap, KitErrors } from 'const';
+import { Actions, MidiMap, KitErrors, DeviceType } from 'const';
 import { confirmFileOverwrite } from 'actions/modal';
 import { showNotice } from 'actions/notice';
 import { KitModel, PadModel } from 'state/models';
 import { openKitFileDialog } from 'util/fileDialog';
-import { getKitAndPadsFromFile } from 'util/kitFile';
-import { saveKitToFile, kitWillOverwriteExisting } from 'util/storage';
+import { getKitAndPadsFromFile as getKitAndPadsFromFileRack } from 'util/kitFile';
+import { getKitAndPadsFromFile as getKitAndPadsFromFilePro } from 'util/kitFilePro';
+import { saveKitToFile, kitWillOverwriteExisting, detectDeviceTypeFromKitFile } from 'util/storage';
+
+// Device-aware wrapper for getKitAndPadsFromFile
+const getKitAndPadsFromFile = (drive, filePath) => {
+  return drive.deviceType === DeviceType.SAMPLEPAD_PRO
+    ? getKitAndPadsFromFilePro(drive, filePath)
+    : getKitAndPadsFromFileRack(drive, filePath);
+};
+
+/**
+ * Auto-detect and switch device type if kit file doesn't match current mode
+ * @param {String} kitFilePath - path to the kit file
+ * @param {Function} dispatch - Redux dispatch function
+ * @param {Function} getState - Redux getState function
+ * @returns {Object} Updated state after potential device type change
+ */
+const autoSwitchDeviceType = (kitFilePath, dispatch, getState) => {
+  let state = getState();
+  const detectedDeviceType = detectDeviceTypeFromKitFile(kitFilePath);
+
+  if (detectedDeviceType && detectedDeviceType !== state.drive.deviceType) {
+    // Auto-switch device type
+    dispatch({ type: Actions.SET_DEVICE_TYPE, deviceType: detectedDeviceType });
+    const deviceName = detectedDeviceType === DeviceType.SAMPLEPAD_PRO ? 'Samplepad Pro' : 'Samplerack';
+    dispatch(showNotice("is-info", `Auto-switched to ${deviceName} mode`));
+
+    // Re-fetch state after device type change
+    state = getState();
+  }
+
+  return state;
+};
 
 /** KIT ACTION CREATORS */
 /**
@@ -19,10 +51,13 @@ export function importKitFromFile() {
           return null;
         }
 
-        // catch an error, maybe an invalid file?
-        let state = getState();
+        const kitFilePath = result.filePaths[0];
+
+        // Auto-detect and switch device type if needed
+        const state = autoSwitchDeviceType(kitFilePath, dispatch, getState);
+
         try {
-          let {kit, pads} = getKitAndPadsFromFile(state.drive, result.filePaths[0]);
+          let {kit, pads} = getKitAndPadsFromFile(state.drive, kitFilePath);
 
           // remove the filename, as a new one will get created
           kit.filePath = state.drive.kitPath;
@@ -50,11 +85,13 @@ export function importKitFromFile() {
  */
 export function loadKitDetails(kitId) {
   return (dispatch, getState) => {
-    let state = getState();
-    let kit = state.kits.models[kitId];
+    let kit = getState().kits.models[kitId];
 
     if (!kit.isLoaded) {
       let kitFile = kit.filePath + "/" + kit.fileName;
+
+      // Auto-detect and switch device type if needed
+      const state = autoSwitchDeviceType(kitFile, dispatch, getState);
 
       try {
         let result = getKitAndPadsFromFile(state.drive, kitFile);

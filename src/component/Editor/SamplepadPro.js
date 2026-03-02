@@ -3,7 +3,7 @@ import React from 'react';
 import { connect } from 'react-redux'
 
 /* App imports */
-import { getPadWithType } from 'util/kitFile'
+import { getPadWithType } from 'util/kitFilePro'
 
 /* Component imports */
 import PadRowComponent from 'component/Pad/Row'

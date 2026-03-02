@@ -1,0 +1,26 @@
+{
+  "kit": {
+    "deviceType": "samplepad_pro",
+    "kitName": "Empty Kit",
+    "fileName": "empty.KIT"
+  },
+  "pads": [
+    {"padType": "pad_01", "location": 0, "level": 10, "tune": 0, "pan": 0, "reverb": 0, "midiNote": 49, "mode": 1, "sensitivity": 1, "mgrp": 0, "velocityMin": 0, "velocityMax": 127, "fileName": "", "velocityMinB": 0, "velocityMaxB": 127, "fileNameB": ""},
+    {"padType": "pad_02", "location": 0, "level": 10, "tune": 0, "pan": 0, "reverb": 0, "midiNote": 51, "mode": 1, "sensitivity": 1, "mgrp": 0, "velocityMin": 0, "velocityMax": 127, "fileName": "", "velocityMinB": 0, "velocityMaxB": 127, "fileNameB": ""},
+    {"padType": "pad_03", "location": 0, "level": 10, "tune": 0, "pan": 0, "reverb": 0, "midiNote": 48, "mode": 1, "sensitivity": 1, "mgrp": 0, "velocityMin": 0, "velocityMax": 127, "fileName": "", "velocityMinB": 0, "velocityMaxB": 127, "fileNameB": ""},
+    {"padType": "pad_04", "location": 0, "level": 10, "tune": 0, "pan": 0, "reverb": 0, "midiNote": 45, "mode": 1, "sensitivity": 1, "mgrp": 0, "velocityMin": 0, "velocityMax": 127, "fileName": "", "velocityMinB": 0, "velocityMaxB": 127, "fileNameB": ""},
+    {"padType": "pad_05", "location": 0, "level": 10, "tune": 0, "pan": 0, "reverb": 0, "midiNote": 46, "mode": 1, "sensitivity": 1, "mgrp": 0, "velocityMin": 0, "velocityMax": 127, "fileName": "", "velocityMinB": 0, "velocityMaxB": 127, "fileNameB": ""},
+    {"padType": "pad_06", "location": 0, "level": 10, "tune": 0, "pan": 0, "reverb": 0, "midiNote": 36, "mode": 1, "sensitivity": 1, "mgrp": 0, "velocityMin": 0, "velocityMax": 127, "fileName": "", "velocityMinB": 0, "velocityMaxB": 127, "fileNameB": ""},
+    {"padType": "pad_07", "location": 0, "level": 10, "tune": 0, "pan": 0, "reverb": 0, "midiNote": 38, "mode": 1, "sensitivity": 1, "mgrp": 0, "velocityMin": 0, "velocityMax": 127, "fileName": "", "velocityMinB": 0, "velocityMaxB": 127, "fileNameB": ""},
+    {"padType": "pad_08", "location": 0, "level": 10, "tune": 0, "pan": 0, "reverb": 0, "midiNote": 42, "mode": 1, "sensitivity": 1, "mgrp": 0, "velocityMin": 0, "velocityMax": 127, "fileName": "", "velocityMinB": 0, "velocityMaxB": 127, "fileNameB": ""},
+    {"padType": "ext_1a", "location": 0, "level": 10, "tune": 0, "pan": 0, "reverb": 0, "midiNote": 38, "mode": 1, "sensitivity": 1, "mgrp": 0, "velocityMin": 0, "velocityMax": 127, "fileName": "", "velocityMinB": 0, "velocityMaxB": 127, "fileNameB": ""},
+    {"padType": "ext_1b", "location": 0, "level": 10, "tune": 0, "pan": 0, "reverb": 0, "midiNote": 40, "mode": 1, "sensitivity": 1, "mgrp": 0, "velocityMin": 0, "velocityMax": 127, "fileName": "", "velocityMinB": 0, "velocityMaxB": 127, "fileNameB": ""},
+    {"padType": "ext_2", "location": 0, "level": 10, "tune": 0, "pan": 0, "reverb": 0, "midiNote": 43, "mode": 1, "sensitivity": 1, "mgrp": 0, "velocityMin": 0, "velocityMax": 127, "fileName": "", "velocityMinB": 0, "velocityMaxB": 127, "fileNameB": ""},
+    {"padType": "kick", "location": 0, "level": 10, "tune": 0, "pan": 0, "reverb": 0, "midiNote": 36, "mode": 1, "sensitivity": 1, "mgrp": 0, "velocityMin": 0, "velocityMax": 127, "fileName": "", "velocityMinB": 0, "velocityMaxB": 127, "fileNameB": ""},
+    {"padType": "hh_ope", "location": 0, "level": 10, "tune": 0, "pan": 0, "reverb": 0, "midiNote": 46, "mode": 1, "sensitivity": 1, "mgrp": 0, "velocityMin": 0, "velocityMax": 127, "fileName": "", "velocityMinB": 0, "velocityMaxB": 127, "fileNameB": ""},
+    {"padType": "hh_mid", "location": 0, "level": 10, "tune": 0, "pan": 0, "reverb": 0, "midiNote": 23, "mode": 1, "sensitivity": 1, "mgrp": 0, "velocityMin": 0, "velocityMax": 127, "fileName": "", "velocityMinB": 0, "velocityMaxB": 127, "fileNameB": ""},
+    {"padType": "hh_clo", "location": 0, "level": 10, "tune": 0, "pan": 0, "reverb": 0, "midiNote": 42, "mode": 1, "sensitivity": 1, "mgrp": 0, "velocityMin": 0, "velocityMax": 127, "fileName": "", "velocityMinB": 0, "velocityMaxB": 127, "fileNameB": ""},
+    {"padType": "hh_chk", "location": 0, "level": 10, "tune": 0, "pan": 0, "reverb": 0, "midiNote": 44, "mode": 1, "sensitivity": 1, "mgrp": 0, "velocityMin": 0, "velocityMax": 127, "fileName": "", "velocityMinB": 0, "velocityMaxB": 127, "fileNameB": ""},
+    {"padType": "hh_spl", "location": 0, "level": 10, "tune": 0, "pan": 0, "reverb": 0, "midiNote": 21, "mode": 1, "sensitivity": 1, "mgrp": 0, "velocityMin": 0, "velocityMax": 127, "fileName": "", "velocityMinB": 0, "velocityMaxB": 127, "fileNameB": ""}
+  ]
+}
